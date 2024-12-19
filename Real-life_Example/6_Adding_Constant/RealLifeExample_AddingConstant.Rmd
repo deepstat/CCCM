@@ -1,0 +1,109 @@
+---
+title: "RealLifeExample_AddingConstant"
+output: html_document
+---
+
+```{r}
+# install.packages("readxl")
+# install.packages("reshape2")
+# install.packages("dplyr")
+# install.packages("ggplot2")
+# install.packages("DescTools")
+
+library(readxl)
+library(reshape2)
+library(dplyr)
+library(ggplot2)
+
+library(DescTools)
+source("est_CCCM.R")
+```
+
+```{r}
+dat <- read_xlsx(
+    "..\\0_RealData\\raw_data.xlsx")
+```
+
+```{r}
+dat_mat <- 
+    dat |>
+    mutate(id = 1:25) |>
+    melt(id.vars = "id") |>
+    dcast(id ~ variable) |>
+    select_at(vars(-"id")) |>
+    relocate(MarginalGap_RT, MarginalGap_CART, OcclusalGap_RT, OcclusalGap_CART) |>
+    as.matrix() |>
+    (function(x){
+        dim(x) <- c(25, 2, 2);
+        return(x)})()
+```
+
+```{r}
+avgCCC_df <- data.frame()
+for(i in 0:1000){
+    tmp_mat <- dat_mat
+    tmp_mat[,2,2] <- tmp_mat[,2,2] + i*0.05
+    
+    CI_MarginalGap <- CCC(
+        x = tmp_mat[,1,1], 
+        y = tmp_mat[,2,1])
+    CI_OcclusalGap <- CCC(
+        x = tmp_mat[,1,2], 
+        y = tmp_mat[,2,2])
+    
+    CI_CCCM <- est_CCCM(tmp_mat)
+    
+    avgCCC_df <- rbind(
+        avgCCC_df,
+        data.frame(
+            mean_shift     =i*0.05,
+            avgCCC         =mean(
+                c(CI_MarginalGap$rho.c$est,
+                  CI_OcclusalGap$rho.c$est)),
+            CCCM           =CI_CCCM$CCCM,
+            CCC_MarginalGap=CI_MarginalGap$rho.c$est,
+            CCC_OcclusalGap=CI_OcclusalGap$rho.c$est))
+}
+```
+
+```{r, fig.width=6, fig.height=4}
+g0 <- avgCCC_df |>
+    melt(
+        id.vars='mean_shift',
+        variable.name='method') |>
+    mutate(
+        method=ifelse(
+            method=="CCC_MarginalGap",
+            "CCC (Marginal)",
+            ifelse(
+                method=="CCC_OcclusalGap",
+                "CCC (Occlusal)",
+                as.character(method)
+                ))) |>
+    mutate(
+        method=factor(
+            method,
+            levels=c("CCC (Marginal)",
+                     "CCC (Occlusal)",
+                     "avgCCC",
+                     "CCCM"))) |>
+    ggplot(aes(
+        x=mean_shift,
+        y=value,
+        group=method,
+        colour=method,
+        linetype=method)) +
+    geom_line() +
+    theme_bw() +
+    xlab("Adding constant") +
+    ylab("Estimate") +
+    theme(legend.title=element_blank())
+
+ggsave(
+    filename="avg_CCC_vs_CCCM.pdf",
+    plot    =g0,
+    width   =6,
+    height  =4
+)
+g0
+```

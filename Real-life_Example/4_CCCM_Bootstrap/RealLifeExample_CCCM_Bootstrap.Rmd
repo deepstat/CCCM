@@ -1,0 +1,52 @@
+---
+title: "RealLifeExample_CCCM_Bootstrap"
+output: html_document
+---
+
+```{r}
+# install.packages("readxl")
+# install.packages("reshape2")
+# install.packages("dplyr")
+
+library(readxl)
+library(reshape2)
+library(dplyr)
+
+source("est_CCCM.R")
+```
+
+```{r}
+dat <- read_xlsx(
+    "..\\0_RealData\\raw_data.xlsx")
+```
+
+```{r}
+dat_mat <- 
+    dat |>
+    mutate(id = 1:25) |>
+    melt(id.vars = "id") |>
+    dcast(id ~ variable) |>
+    select_at(vars(-"id")) |>
+    relocate(MarginalGap_RT, MarginalGap_CART, OcclusalGap_RT, OcclusalGap_CART) |>
+    as.matrix() |>
+    (function(x){
+        dim(x) <- c(25, 2, 2);
+        return(x)})()
+
+CI_result <- est_CCCM(dat_mat)
+CI_result
+```
+
+```{r}
+set.seed(1)
+num_bootstrap <- 1000
+BOOTSTRAP_CCCM <- numeric(num_bootstrap)
+for(i in 1:num_bootstrap){
+    tmp_idx <- sample(1:25, replace=T)
+    tmp_dat <- dat_mat[tmp_idx,,]
+    BOOTSTRAP_CCCM[i] <- est_CCCM(tmp_dat)$CCCM
+}
+
+mean(BOOTSTRAP_CCCM)
+quantile(BOOTSTRAP_CCCM, probs=c(0.025, 0.975))
+```

@@ -1,0 +1,38 @@
+---
+title: "RealLifeExample_MCCC"
+output: html_document
+---
+
+```{r}
+# install.packages("readxl")
+# install.packages("reshape2")
+# install.packages("dplyr")
+
+library(readxl)
+library(reshape2)
+library(dplyr)
+
+source("est_MCCC.R")
+```
+
+```{r}
+dat <- read_xlsx(
+    "..\\0_RealData\\raw_data.xlsx")
+```
+
+```{r}
+dat_mat <- 
+    dat |>
+    mutate(id = 1:25) |>
+    melt(id.vars = "id") |>
+    dcast(id ~ variable) |>
+    select_at(vars(-"id")) |>
+    relocate(MarginalGap_RT, MarginalGap_CART, OcclusalGap_RT, OcclusalGap_CART) |>
+    as.matrix() |>
+    (function(x){
+        dim(x) <- c(25, 2, 2);
+        return(x)})()
+
+CI_result <- est_MCCC(dat_mat)
+CI_result
+```

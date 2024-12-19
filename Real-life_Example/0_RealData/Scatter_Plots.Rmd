@@ -1,0 +1,67 @@
+---
+title: "Scatter_Plots"
+output: html_document
+---
+
+```{r}
+# install.packages("readxl")
+# install.packages("reshape2")
+# install.packages("dplyr")
+# install.packages("ggplot2")
+
+library(readxl)
+library(reshape2)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r, fig.width=4, fig.height=4}
+dat <- read_xlsx(
+    "..\\0_RealData\\raw_data.xlsx")
+
+
+g0 <- dat |>
+    ggplot(aes(
+        x=MarginalGap_RT,
+        y=MarginalGap_CART)) +
+    geom_point() +
+    geom_abline(
+        slope=1, intercept=0,
+        linetype=2, colour='red') +
+    theme_bw() +
+    xlab("RT (μm)") +
+    ylab("CART (μm)") +
+    ggtitle("Marginal Gap") +
+    theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(
+    filename="MarginalGap.pdf",
+    plot    =g0,
+    width   =4,
+    height  =4
+)
+g0
+
+g1 <- dat |>
+    ggplot(aes(
+        x=OcclusalGap_RT,
+        y=OcclusalGap_CART)) +
+    geom_point() +
+    geom_abline(
+        slope=1, intercept=0,
+        linetype=2, colour='red') +
+    theme_bw() +
+    xlab("RT (μm)") +
+    ylab("CART (μm)") +
+    ggtitle("Occlusal Gap") +
+    theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(
+    filename="OcclusalGap.pdf",
+    plot    =g1,
+    width   =4,
+    height  =4
+)
+g1
+
+```

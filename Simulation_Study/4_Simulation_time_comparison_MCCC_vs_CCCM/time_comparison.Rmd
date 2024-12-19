@@ -1,0 +1,85 @@
+---
+title: "Time Comparison MCCC vs CCCM"
+output: html_document
+---
+```{r}
+rm(list=ls())
+```
+
+```{r}
+library(ggplot2)
+source("est_MCCC.R")
+source("est_CCCM.R")
+```
+
+```{r}
+set.seed(0)
+sim_dat <- rnorm(1000*2*5); dim(sim_dat) <- c(1000, 2, 5)
+```
+
+```{r}
+time_MCCC <- numeric(10)
+
+for(i in 1:10){
+    start_time <- Sys.time()
+    est_MCCC(sim_dat)
+    time_MCCC[i] <- Sys.time()-start_time
+}
+
+mean(time_MCCC)
+sd(time_MCCC)
+quantile(time_MCCC,probs=c(0.025, 0.5, 0.975))
+time_MCCC
+```
+
+```{r}
+time_CCCM <- numeric(10)
+
+for(i in 1:10){
+    start_time <- Sys.time()
+    est_CCCM(sim_dat)
+    time_CCCM[i] <- Sys.time()-start_time
+}
+
+mean(time_CCCM)
+sd(time_CCCM)
+quantile(time_CCCM,probs=c(0.025, 0.5, 0.975))
+time_CCCM
+```
+```{r, fig.width=3*1.618, fig.height=3*1}
+time_df <- rbind(
+    data.frame(
+        method="MCCC",
+        time=time_MCCC),
+    data.frame(
+        method="CCCM",
+        time=time_CCCM)
+    )
+
+time_df |>
+    ggplot() +
+    aes(x=method, y=time) +
+    geom_boxplot(outlier.alpha=0) +
+    geom_jitter(width=0.2) +
+    ylab("Computation Time (s)") +
+    scale_y_continuous(breaks=(0:4)*5,
+                       minor_breaks=(0:8)*2.5) +
+    theme_bw() +
+    theme(axis.title.x=element_blank())
+
+ggsave(filename="time_comparison.pdf")
+
+time_df |>
+    ggplot() +
+    aes(x=method, y=time) +
+    geom_boxplot(outlier.alpha=0) +
+    geom_jitter(width=0.2) +
+    ylab("Computation Time (s)") +
+    scale_y_continuous(trans="log2",
+                       breaks=(0:4)*5,
+                       minor_breaks=(0:8)*2.5) +
+    theme_bw() +
+    theme(axis.title.x=element_blank())
+
+ggsave(filename="time_comparison_log2.pdf")
+```

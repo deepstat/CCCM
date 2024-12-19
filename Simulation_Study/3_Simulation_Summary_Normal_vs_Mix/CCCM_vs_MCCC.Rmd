@@ -1,0 +1,359 @@
+---
+title: "CCCM vs MCCC"
+output: html_document
+---
+
+# Packages
+
+```{r}
+suppressPackageStartupMessages({
+    library(ggplot2)
+    library(dplyr)
+    library(kableExtra)
+    library(scales)
+})
+```
+
+# CCCM results
+
+```{r}
+simulation_set <-
+    read.csv(
+        paste0(
+            "../",
+            "1_Simulation_CCCM/",
+            "cand_df.csv"))
+dim(simulation_set)
+
+simulation_set |>
+    head() |>
+    kable() |>
+    kable_styling()
+```
+
+```{r}
+result_list <-
+    list.files(
+        paste0(
+            "../",
+            "1_Simulation_CCCM/",
+            "results/"))
+
+length(result_list)
+```
+
+```{r}
+result_df <- data.frame()
+
+for(i in 1:length(result_list)){
+    csv_dir <- paste0(
+        "../",
+        "1_Simulation_CCCM/",
+        "results/",
+        result_list[i])
+    
+    tmp_result <- read.csv(csv_dir) |>
+        summarize(
+            true_value=mean(CCCM),
+            point_est=mean(est_CCCM),
+            mean_range=mean(upper_bound-lower_bound),
+            coverage=mean(
+                (lower_bound <= CCCM)&(CCCM <= upper_bound)),
+            mean_abs_bias=mean(abs(CCCM-est_CCCM)),
+            rmse=sqrt(mean((CCCM-est_CCCM)^2)),
+            sim_set_num=mean(simulation_setting_num))
+    
+    result_df <- rbind(result_df, tmp_result)
+}
+
+result_df <- simulation_set |>
+    left_join(result_df, by=c("X"="sim_set_num"))
+
+colnames(result_df)[1] <- "sim_set_num"
+
+write.csv(
+    x=result_df,
+    file="./summary_CCCM.csv",
+    row.names=FALSE)
+
+result_df |>
+    head() |>
+    kable() |>
+    kable_styling()
+
+CCCM <- result_df
+```
+
+# MCCC results
+
+```{r}
+simulation_set <-
+    read.csv(
+        paste0(
+            "../",
+            "2_Simulation_MCCC/",
+            "cand_df.csv"))
+dim(simulation_set)
+
+simulation_set |>
+    head() |>
+    kable() |>
+    kable_styling()
+```
+
+```{r}
+result_list <-
+    list.files(
+        paste0(
+            "../",
+            "2_Simulation_MCCC/",
+            "results/"))
+
+length(result_list)
+```
+
+```{r}
+result_df <- data.frame()
+
+for(i in 1:length(result_list)){
+    csv_dir <- paste0(
+        "../",
+        "2_Simulation_MCCC/",
+        "results/",
+        result_list[i])
+    
+    file_num_i <- result_list[i] |>
+        strsplit(split=".", fixed=TRUE) |>
+        lapply(`[`,1) |>
+        unlist() |>
+        as.numeric()
+    
+    if(simulation_set$dist_i[file_num_i] == 1){
+        tmp_result <- read.csv(csv_dir) |>
+            summarize(
+                true_value=mean(MCCC),
+                point_est=mean(MCCC_est),
+                mean_range=mean(upper_bound-lower_bound),
+                coverage=mean(
+                    (lower_bound <= MCCC)&(MCCC <= upper_bound)),
+                mean_abs_bias=mean(abs(MCCC-MCCC_est)),
+                rmse=sqrt(mean((MCCC-MCCC_est)^2)),
+                sim_set_num=mean(simulation_setting_num))
+        
+        result_df <- rbind(result_df, tmp_result)
+    }else if(simulation_set$dist_i[file_num_i] == 2){
+        tmp_result <- read.csv(csv_dir) |>
+            summarize(
+                true_value=mean(MCCC),
+                point_est=mean(est_MCCC),
+                mean_range=mean(upper_bound-lower_bound),
+                coverage=mean(
+                    (lower_bound <= MCCC)&(MCCC <= upper_bound)),
+                mean_abs_bias=mean(abs(MCCC-est_MCCC)),
+                rmse=sqrt(mean((MCCC-est_MCCC)^2)),
+                sim_set_num=mean(simulation_setting_num))
+        
+        result_df <- rbind(result_df, tmp_result)
+    }
+}
+
+result_df <- simulation_set |>
+    left_join(result_df, by=c("X"="sim_set_num"))
+
+colnames(result_df)[1] <- "sim_set_num"
+
+write.csv(
+    x=result_df,
+    file="./summary_MCCC.csv",
+    row.names=FALSE)
+
+result_df |>
+    head() |>
+    kable() |>
+    kable_styling()
+
+MCCC <- result_df
+```
+
+# To read CSVs
+
+```{r}
+CCCM <- read.csv("summary_CCCM.csv")
+MCCC <- read.csv("summary_MCCC.csv")
+```
+
+```{r}
+CCCM$method <- "CCCM"
+MCCC$method <- "MCCC"
+
+CCCM$sim_set_num <- 1:nrow(CCCM)
+MCCC$sim_set_num <- 1:nrow(MCCC)
+
+fin_df         <- rbind(CCCM, MCCC)
+fin_df$M_i     <- paste0("M[", fin_df$M_i,"]")
+fin_df$n_i     <- c(20, 50, 100)[fin_df$n_i]
+fin_df$rho_c_i <- paste0("rho[c]==",
+                         c(0.0,0.9)[fin_df$rho_c_i])
+fin_df$u22_i   <- c("same_variance")[fin_df$u22_i]
+fin_df$rho_r_i <- paste0("rho[r]==",
+                         c(0.0, 0.5, 0.9)[fin_df$rho_r_i])
+fin_df$dist_i <- c("norm",
+                   "mix")[fin_df$dist_i]
+fin_df |>
+    kable() |>
+    kable_styling() |>
+    scroll_box(width = "100%", height = "250px")
+```
+
+# Plots
+
+## Coverage
+
+### For M_1
+
+```{r, fig.width=7, fig.height=5}
+g0 <- fin_df |>
+    filter(M_i == "M[1]") |>
+    mutate(sim_set_num=as.character(sim_set_num)) |>
+    ggplot(aes(x=n_i,
+               y=coverage,
+               group=interaction(rho_c_i, dist_i),
+               linetype=rho_c_i,
+               shape=dist_i)) +
+    geom_line() +
+    geom_point() +
+    geom_hline(yintercept=0.95,
+               linetype=2) +
+    facet_grid(rho_r_i ~ method,
+               labeller=label_parsed) +
+    theme_bw() +
+    theme(legend.title = element_blank(),
+          strip.background=element_rect(
+              colour="black", fill="white")) +
+    scale_linetype(labels=parse_format()) +
+    xlab("n") +
+    ylab("Coverage")
+
+ggsave(
+    filename="Sim_M1_coverage2.pdf",
+    plot    =g0,
+    width   =7,
+    height  =5)
+
+g0
+```
+
+### For M_2
+
+```{r, fig.width=7, fig.height=5}
+g0 <- fin_df |>
+    filter(M_i == "M[2]") |>
+    mutate(sim_set_num=as.character(sim_set_num)) |>
+    ggplot(aes(x=n_i,
+               y=coverage,
+               group=interaction(rho_c_i, dist_i),
+               linetype=rho_c_i,
+               shape=dist_i)) +
+    geom_line() +
+    geom_point() +
+    geom_hline(yintercept=0.95,
+               linetype=2) +
+    facet_grid(rho_r_i ~ method,
+               labeller=label_parsed) +
+    theme_bw() +
+    theme(legend.title = element_blank(),
+          strip.background=element_rect(
+              colour="black", fill="white")) +
+    scale_linetype(labels=parse_format()) +
+    xlab("n") +
+    ylab("Coverage")
+
+ggsave(
+    filename="Sim_M2_coverage2.pdf",
+    plot    =g0,
+    width   =7,
+    height  =5)
+
+g0
+```
+
+## RMSE
+
+### For M_1
+
+```{r, fig.width=5, fig.height=5}
+g0 <- fin_df |>
+    filter(M_i == "M[1]") |>
+    filter(method == "CCCM") |>
+    mutate(sim_set_num=as.character(sim_set_num)) |>
+    ggplot(aes(x=n_i,
+               y=rmse,
+               group=interaction(rho_c_i, dist_i),
+               linetype=rho_c_i,
+               shape=dist_i)) +
+    geom_line() +
+    geom_point() +
+    geom_hline(yintercept=0,
+               linetype=2) +
+    facet_grid(rho_r_i ~ method,
+               labeller=label_parsed) +
+    theme_bw() +
+    theme(legend.title = element_blank(),
+          strip.background=element_rect(
+              colour="black", fill="white")) +
+    scale_linetype(labels=parse_format()) +
+    xlab("n") +
+    ylab("RMSE")
+
+ggsave(
+    filename="Sim_M1_rmse2.pdf",
+    plot    =g0,
+    width   =5,
+    height  =5)
+
+g0
+```
+
+### For M_2
+
+```{r, fig.width=5, fig.height=5}
+g0 <- fin_df |>
+    filter(M_i == "M[2]") |>
+    filter(method == "CCCM") |>
+    mutate(sim_set_num=as.character(sim_set_num)) |>
+    ggplot(aes(x=n_i,
+               y=rmse,
+               group=interaction(rho_c_i, dist_i),
+               linetype=rho_c_i,
+               shape=dist_i)) +
+    geom_line() +
+    geom_point() +
+    geom_hline(yintercept=0,
+               linetype=2) +
+    facet_grid(rho_r_i ~ method,
+               labeller=label_parsed) +
+    theme_bw() +
+    theme(legend.title = element_blank(),
+          strip.background=element_rect(
+              colour="black", fill="white")) +
+    scale_linetype(labels=parse_format()) +
+    xlab("n") +
+    ylab("RMSE")
+
+ggsave(
+    filename="Sim_M2_rmse2.pdf",
+    plot    =g0,
+    width   =5,
+    height  =5)
+
+g0
+```
+
+
+
+
+
+
+
+
+

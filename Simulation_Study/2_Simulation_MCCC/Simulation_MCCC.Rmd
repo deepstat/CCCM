@@ -1,0 +1,164 @@
+---
+title: "Simulation_MCCC"
+output: html_document
+---
+
+```{r}
+library(matrixNormal)
+library(mvtnorm)
+
+source("est_MCCC.R")
+```
+
+```{r}
+cand_M <- c(
+    4,4,4,4,5,5,6,6,8,8,
+    4,4,4,5,5,6,6,8,8,10)
+dim(cand_M) <- c(2,5,2)
+
+cand_rho_c <- c(0, 0.9)
+
+cand_u22 <- c(4)
+
+cand_rho_r <- c(0, 0.5, 0.9)
+
+cand_n <- c(20, 50, 100)
+
+cand_dist <- c("multivariate_norm",
+               "mix_mult_norm")
+
+cand_df <- data.frame()
+for(a1 in 1:(dim(cand_M)[3])){
+    for(a2 in 1:length(cand_rho_c)){
+        for(a3 in 1:length(cand_u22)){
+            for(a4 in 1:length(cand_rho_r)){
+                for(a5 in 1:length(cand_n)){
+                    for(a6 in 1:length(cand_dist)){
+                        cand_df <- rbind(
+                            cand_df,
+                            data.frame(
+                                M_i = a1,
+                                rho_c_i = a2,
+                                u22_i = a3,
+                                rho_r_i = a4,
+                                n_i = a5,
+                                dist_i = a6
+                            ))
+                    }
+                }
+            }
+        }
+    }
+}
+
+write.csv(cand_df, "cand_df.csv")
+```
+
+```{r, warning=FALSE}
+for(i in 1:nrow(cand_df)){
+    df      <- cand_df[i,]
+    M       <- cand_M[,,df$M_i]
+    V       <- matrix(
+        cand_rho_c[df$rho_c_i],
+        nrow=5, ncol=5)
+    diag(V) <- 1
+    U       <- c(
+        4, sqrt(4)*cand_rho_r[df$rho_r_i]*sqrt(cand_u22[df$u22_i]),
+        sqrt(4)*cand_rho_r[df$rho_r_i]*sqrt(cand_u22[df$u22_i]), cand_u22[df$u22_i])
+    dim(U)  <- c(2,2)
+    n       <- cand_n[df$n_i]
+    dist    <- cand_dist[df$dist_i]
+    
+    if(dist == "multivariate_norm"){
+        # True MCCC
+        V_D  <- (U[1,1] + U[2,2] - U[1,2] - U[2,1]) * V +
+            ((M[1,] - M[2,]) %*% t(M[1,] - M[2,]))
+        V_I  <- (U[1,1] + U[2,2]) * V +
+            ((M[1,] - M[2,]) %*% t(M[1,] - M[2,]))
+        
+        eigen_V_I    <- eigen(V_I)
+        half_inv_V_I <- eigen_V_I$vectors %*%
+            diag((eigen_V_I$values)^-.5) %*%
+            t(eigen_V_I$vectors)
+        
+        MCCC <- 1 - sqrt(sum((half_inv_V_I %*% V_D %*% half_inv_V_I)^2)/5)
+        
+        df <- data.frame()
+        for(iter in 1:1000){
+            # cat("\t i=",i,
+            #     "\t iter=", iter,
+            #     "\t\t",
+            #     '\r', '\r')
+            set.seed(iter)
+            Y <- array(0, c(n, 2, 5))
+            for (j in 1:n){
+                Y[j,,] <- rmatnorm(
+                    s = 1, M = M, U = U, V = V)
+            }
+            CI <- est_MCCC(Y)
+            tmp_df <- data.frame(
+                simulation_setting_num = i,
+                iter = iter,
+                MCCC = MCCC,
+                lower_bound = CI$lower_bound,
+                upper_bound = CI$upper_bound,
+                MCCC_est = CI$MCCC
+            )
+            df <- rbind(df, tmp_df)
+        }
+    }
+    
+    if(dist == "mix_mult_norm"){
+        # True MCCC
+        V_D  <- (U[1,1] + U[2,2] - U[1,2] - U[2,1]) * V +
+            ((M[1,] - M[2,]) %*% t(M[1,] - M[2,]))
+        V_I  <- (U[1,1] + U[2,2]) * V +
+            ((M[1,] - M[2,]) %*% t(M[1,] - M[2,]))
+        
+        eigen_V_I    <- eigen(V_I)
+        half_inv_V_I <- eigen_V_I$vectors %*%
+            diag((eigen_V_I$values)^-.5) %*%
+            t(eigen_V_I$vectors)
+        
+        MCCC <- 1 - sqrt(sum((half_inv_V_I %*% V_D %*% half_inv_V_I)^2)/5)
+        
+        # mix_mult_norm parameters
+        mix_mult_norm_Mean <- c(M)
+        mix_mult_norm_Var <- (V %x% U) - 0.02 * c(M)%*%t(c(M))
+        
+        df <- data.frame()
+        for(iter in 1:1000){
+            # cat("\t i=",i,
+            #     "\t iter=", iter,
+            #     "\t\t",
+            #     '\r', '\r')
+            set.seed(iter)
+            Y <- array(0, c(n, 2, 5))
+            for (j in 1:n){
+                tmp_Z <- rbinom(1, 1, 0.2)
+                tmp_Y <- rmvnorm(
+                    1,
+                    mean  = (0.9+0.3*tmp_Z)*mix_mult_norm_Mean,
+                    sigma = mix_mult_norm_Var)
+                dim(tmp_Y) <- c(2,5)
+                Y[j,,] <- tmp_Y
+            }
+            CI <- est_MCCC(Y)
+            tmp_df <- data.frame(
+                simulation_setting_num = i,
+                iter = iter,
+                MCCC = MCCC,
+                lower_bound = CI$lower_bound,
+                upper_bound = CI$upper_bound,
+                est_MCCC = CI$MCCC
+            )
+            df <- rbind(df, tmp_df)
+        }
+    }
+    write.csv(
+        df,
+        paste0(
+            ".\\results\\",
+            i,".csv"))
+}
+```

@@ -1,0 +1,79 @@
+---
+title: "RealLifeExample_avgCCC"
+output: html_document
+---
+
+```{r}
+# install.packages("readxl")
+# install.packages("reshape2")
+# install.packages("dplyr")
+# install.packages("DescTools")
+
+library(readxl)
+library(reshape2)
+library(dplyr)
+
+library(DescTools)
+```
+
+```{r}
+dat <- read_xlsx(
+    "..\\0_RealData\\raw_data.xlsx")
+```
+
+```{r}
+dat_mat <- 
+    dat |>
+    mutate(id = 1:25) |>
+    melt(id.vars = "id") |>
+    dcast(id ~ variable) |>
+    select_at(vars(-"id")) |>
+    relocate(MarginalGap_RT, MarginalGap_CART, OcclusalGap_RT, OcclusalGap_CART) |>
+    as.matrix() |>
+    (function(x){
+        dim(x) <- c(25, 2, 2);
+        return(x)})()
+```
+
+# avgCCC
+
+```{r}
+CI_MarginalGap <- CCC(
+    x = dat_mat[,1,1], 
+    y = dat_mat[,2,1])
+
+CI_OcclusalGap <- CCC(
+    x = dat_mat[,1,2], 
+    y = dat_mat[,2,2])
+```
+
+```{r}
+avgCCC <- mean(c(
+    CI_MarginalGap$rho.c[["est"]],
+    CI_OcclusalGap$rho.c[["est"]]))
+avgCCC
+```
+
+# Bootstrap
+
+```{r}
+set.seed(1)
+num_bootstrap <- 1000
+BOOTSTRAP_avgCCC <- numeric(num_bootstrap)
+for(i in 1:num_bootstrap){
+    tmp_idx <- sample(1:25, replace=T)
+    tmp_dat <- dat_mat[tmp_idx,,]
+    result_MarginalGap <- CCC(
+        x = tmp_dat[,1,1], 
+        y = tmp_dat[,2,1])
+    result_OcclusalGap <- CCC(
+        x = tmp_dat[,1,2], 
+        y = tmp_dat[,2,2])
+    BOOTSTRAP_avgCCC[i] <- mean(c(
+        result_MarginalGap$rho.c[["est"]],
+        result_OcclusalGap$rho.c[["est"]]))
+}
+
+mean(BOOTSTRAP_avgCCC)
+quantile(BOOTSTRAP_avgCCC, probs=c(0.025, 0.975))
+```
