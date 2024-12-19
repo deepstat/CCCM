@@ -4,7 +4,7 @@ This repository contains the R code used in the paper "Concordance Correlation C
 
 ## Introduction
 
-This paper proposes a novel method for assessing the agreement of multivariate measurement data: the Concordance Correlation Coefficient for Multivariate Measurements (CCCM). The R code in this repository provides CCCM and the Matrix Concordance Correlation Coefficient (MCCC) calculation method presented in the paper.
+This paper proposes a novel method for assessing the agreement of multivariate measurement data: the Concordance Correlation Coefficient for Multivariate Measurements (CCCM). The R code in this repository provides CCCM calculation presented in the paper and the Matrix-based Concordance Correlation Coefficient (MCCC) calculation (Hiriote and Chinchilli, 2011; https://www.jstor.org/stable/41242549)
 
 ## Repository Structure
 
